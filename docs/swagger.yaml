@@ -1,0 +1,303 @@
+basePath: /weaviate-admin
+definitions:
+  main.AddTenantRequest:
+    properties:
+      tenant_name:
+        example: tenant_01
+        type: string
+    type: object
+  main.CreateBackupRequest:
+    properties:
+      backend:
+        example: filesystem
+        type: string
+      backup_id:
+        example: backup-2026-04-17
+        type: string
+    type: object
+  main.CreateCollectionRequest:
+    properties:
+      name:
+        example: Article
+        type: string
+    type: object
+  main.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  main.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  main.PingResponse:
+    properties:
+      error:
+        type: string
+      message:
+        example: Weaviate đang hoạt động khỏe mạnh
+        type: string
+      status:
+        example: PONG
+        type: string
+    type: object
+  main.RestoreBackupRequest:
+    properties:
+      backend:
+        example: filesystem
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: API quản trị hệ thống Weaviate Vector Database.
+  title: Weaviate Admin API
+  version: "1.0"
+paths:
+  /backups:
+    post:
+      consumes:
+      - application/json
+      description: Yêu cầu Weaviate đóng gói snapshot toàn bộ dữ liệu ra backend cấu
+        hình sẵn
+      parameters:
+      - description: Thông tin Backup
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateBackupRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/main.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Tạo bản Backup
+      tags:
+      - System
+  /backups/{id}/restore:
+    post:
+      consumes:
+      - application/json
+      description: Yêu cầu Weaviate phục hồi dữ liệu từ một bản backup (snapshot)
+        đã tồn tại
+      parameters:
+      - description: ID của bản Backup cần phục hồi
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin Backend lưu trữ
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.RestoreBackupRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/main.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Phục hồi bản Backup
+      tags:
+      - System
+  /cluster/nodes:
+    get:
+      description: Trả về trạng thái của các node trong Weaviate cluster
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Lấy danh sách Nodes
+      tags:
+      - Cluster
+  /collections:
+    post:
+      consumes:
+      - application/json
+      description: Khởi tạo một Collection mới
+      parameters:
+      - description: Tên Collection
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateCollectionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Tạo Collection
+      tags:
+      - Collections
+  /collections/{name}:
+    get:
+      description: Xem chi tiết schema (vectorizer, properties) của một Collection
+      parameters:
+      - description: Tên Collection
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Lấy thông tin Collection
+      tags:
+      - Collections
+  /collections/{name}/objects:
+    get:
+      description: Trình duyệt các bản ghi có trong Collection
+      parameters:
+      - description: Tên Collection
+        in: path
+        name: name
+        required: true
+        type: string
+      - default: 10
+        description: 'Giới hạn số lượng kết quả (Mặc định: 10)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Xem dữ liệu Objects
+      tags:
+      - Data
+  /collections/{name}/tenants:
+    get:
+      description: Lấy danh sách toàn bộ tenants thuộc về một Collection
+      parameters:
+      - description: Tên Collection
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Xem danh sách Tenants
+      tags:
+      - Collections
+    post:
+      consumes:
+      - application/json
+      description: Đăng ký một tenant mới vào collection
+      parameters:
+      - description: Tên Collection
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Thông tin Tenant
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.AddTenantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Thêm Tenant
+      tags:
+      - Collections
+  /ping:
+    get:
+      description: Gọi ping và liveness/readiness probe
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PingResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/main.PingResponse'
+      summary: Kiểm tra trạng thái Weaviate
+      tags:
+      - System
+swagger: "2.0"

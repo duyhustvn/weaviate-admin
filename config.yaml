@@ -1,0 +1,7 @@
+server:
+  port: 8082
+
+weaviate:
+  host: localhost:8080
+  schema: http
+  api_key: changeme
