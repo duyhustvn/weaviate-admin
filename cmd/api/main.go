@@ -7,7 +7,7 @@ import (
 	"weaviate-admin/internal/config"
 	"weaviate-admin/internal/core"
 
-	_ "weaviate-admin/docs" // QUAN TRỌNG: Import thư mục docs của swag
+	_ "weaviate-admin/docs" // Import thư mục docs của swag
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -47,6 +47,10 @@ type MessageResponse struct {
 
 type RestoreBackupRequest struct {
 	Backend string `json:"backend" example:"filesystem"`
+}
+
+type UpdateMetadataRequest struct {
+	Properties map[string]interface{} `json:"properties"`
 }
 
 // ==========================================
@@ -101,16 +105,22 @@ func main() {
 	// Route cho Swagger UI
 	apiGroup.GET("/swagger/*", echoSwagger.WrapHandler)
 
-	// Các API cũ
 	apiGroup.GET("/ping", handler.Ping)
-	apiGroup.GET("/cluster/nodes", handler.GetNodes)
-	apiGroup.POST("/collections", handler.CreateCollection)
-	apiGroup.POST("/collections/:name/tenants", handler.AddTenant)
 
-	// Các API mới bổ sung
+	apiGroup.GET("/cluster/nodes", handler.GetNodes)
+
 	apiGroup.GET("/collections/:name", handler.GetCollection)
+	apiGroup.POST("/collections", handler.CreateCollection)
+
+	apiGroup.POST("/collections/:name/tenants", handler.AddTenant)
 	apiGroup.GET("/collections/:name/tenants", handler.GetTenants)
+
 	apiGroup.GET("/collections/:name/objects", handler.GetObjects)
+	apiGroup.GET("/collections", handler.ListCollections)
+
+	// API update Metadata của một Object cụ thể
+	apiGroup.PUT("/collections/:name/objects/:id", handler.UpdateMetadata)
+
 	apiGroup.POST("/backups", handler.CreateBackup)
 	apiGroup.POST("/backups/:id/restore", handler.RestoreBackup)
 
@@ -336,4 +346,49 @@ func (h *APIHandler) RestoreBackup(c echo.Context) error {
 
 	// Trả về 202 Accepted vì quá trình load dữ liệu từ ổ cứng vào RAM có thể mất thời gian
 	return c.JSON(http.StatusAccepted, MessageResponse{Message: "Tiến trình phục hồi dữ liệu bản " + backupID + " đã được khởi chạy"})
+}
+
+// ListCollections godoc
+// @Summary Lấy danh sách Collections
+// @Description Liệt kê toàn bộ các Collections (Classes) hiện có trong Weaviate Cluster
+// @Tags Collections
+// @Produce json
+// @Success 200 {array} object
+// @Failure 500 {object} ErrorResponse
+// @Router /collections [get]
+func (h *APIHandler) ListCollections(c echo.Context) error {
+	classes, err := h.repo.ListCollections(c.Request().Context())
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+	}
+	return c.JSON(http.StatusOK, classes)
+}
+
+// UpdateMetadata godoc
+// @Summary Cập nhật Metadata
+// @Description Cập nhật hoặc thêm mới các trường metadata (properties) cho một Object cụ thể dựa vào ID
+// @Tags Data
+// @Accept json
+// @Produce json
+// @Param name path string true "Tên Collection"
+// @Param id path string true "UUID của Object cần cập nhật"
+// @Param request body UpdateMetadataRequest true "Payload chứa các properties cần update"
+// @Success 200 {object} MessageResponse
+// @Failure 400,500 {object} ErrorResponse
+// @Router /collections/{name}/objects/{id} [put]
+func (h *APIHandler) UpdateMetadata(c echo.Context) error {
+	className := c.Param("name")
+	id := c.Param("id")
+
+	var req UpdateMetadataRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request payload"})
+	}
+
+	err := h.repo.UpdateMetadata(c.Request().Context(), className, id, req.Properties)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, MessageResponse{Message: "Metadata updated successfully for object " + id})
 }
